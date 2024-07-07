@@ -26,19 +26,31 @@ sha512sums=(
 )
 chromium_extension_id="cfcbhkcbidaoaeljekeilbnebipmnkjm"
 
+_ensure_local_nvm() {
+    # let's be sure we are starting clean
+    which nvm >/dev/null 2>&1 && nvm deactivate && nvm unload
+    export NVM_DIR="${srcdir}/.nvm"
+
+    # The init script returns 3 if version specified
+    # in ./.nvrc is not (yet) installed in $NVM_DIR
+    # but nvm itself still gets loaded ok
+    source /usr/share/nvm/init-nvm.sh || [[ $? != 1 ]]
+}
+
 prepare() {
   cd "${srcdir}/${pkgbase}"
   cp .metamaskrc.dist .metamaskrc
   # set infura project id
   sed -i -e 's/00000000000/2f8ebfee0f81453d83fe6219b9a59754/g' .metamaskrc
+  # nodejs 20.15 fails with:
+  # TypeError: Cannot read properties of undefined (reading '0')
+  _ensure_local_nvm
+  nvm install 20.14
 }
 
 build() {
   cd "${srcdir}/${pkgbase}"
-  # nodejs 20.15 fails with:
-  # TypeError: Cannot read properties of undefined (reading '0')
-  source /usr/share/nvm/nvm.sh
-  nvm install 20.14
+  _ensure_local_nvm
   yarn # setup
   yarn dist:mv2
 }
