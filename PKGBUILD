@@ -5,27 +5,31 @@
 _pkgbase=metamask
 pkgbase=${_pkgbase}-latest
 _pkgname="${_pkgbase}-extension"
-pkgname=("${pkgbase}-chrome" "${pkgbase}-firefox")
-_addon_id="2e742fd4-1e66-4604-89a2-b99cc03f171a"
+pkgname=("${pkgbase}-chromium" "${pkgbase}-firefox")
 _pkgver=11.16.15
 pkgver=11.16.15
-pkgrel=1
+pkgrel=2
 pkgdesc='Chrome extension that enables browsing Ethereum blockchain enabled websites'
 url="https://github.com/MetaMask/${_pkgname}"
 license=('custom:consensys')
 groups=('firefox-addons')
 arch=('any')
 depends=('chromium' 'typescript')
-makedepends=('git' 'nvm' 'yarn-berry')
+makedepends=('git' 'nvm' 'yarn-berry' 'chromium')
 source=(
   "${pkgbase}::git+$url.git#tag=v${_pkgver}"
-  "metamask_policy.json")
-sha512sums=('SKIP'
-            '912bc9a9ac604b8603bbc34bbc7793caaad4b796ecd3fe59dea2e2e53e22de9573fb9f84e5b2e3601bf2d9193d71f858b066e4a086a8818d9a97cb8fc8d141e4')
+  "chrome.pem"
+)
+sha512sums=(
+  'SKIP'
+  '6732e47d2431484e084512e815e44590c6693d9a1f7a192c0de2f11561fdfd6d87769a375650c4025ab8e2049fd7694ff2c45e19a03991d65c9b8a241bd7292a'
+)
+chromium_extension_id="cfcbhkcbidaoaeljekeilbnebipmnkjm"
 
 prepare() {
   cd "${srcdir}/${pkgbase}"
   cp .metamaskrc.dist .metamaskrc
+  # set infura project id
   sed -i -e 's/00000000000/2f8ebfee0f81453d83fe6219b9a59754/g' .metamaskrc
 }
 
@@ -39,12 +43,25 @@ build() {
   yarn dist:mv2
 }
 
-package_metamask-latest-chrome() {
-  conflicts=(metamask-chrome)
-  replaces=(metamask-chrome)
-  replaces=(provides-chrome)
-  install -Dm644 "${srcdir}/metamask_policy.json" \
-                 "${pkgdir}/etc/chromium/policies/managed/metamask_policy.json"
+package_metamask-latest-chromium() {
+  conflicts=(metamask-chromium)
+  replaces=(metamask-chromium)
+  replaces=(provides-chromium)
+  chromium \
+    --disable-gpu \
+    --disable-namespace-sandbox \
+    --pack-extension="${srcdir}/${pkgbase}/dist/chrome" \
+    --pack-extension-key="${srcdir}/chrome.pem"
+  crx_path="/usr/lib/chromium-extension-metamask/metamask-${_pkgver}.crx"
+  install -Dm644 "${srcdir}/${pkgbase}/dist/chrome.crx" "${pkgdir}${crx_path}"
+  extensions_dir="${pkgdir}/usr/share/chromium/extensions"
+  cat > "${srcdir}/${chromium_extension_id}.json" <<EOF
+{
+	"external_crx": "${crx_path}",
+	"external_version": "${_pkgver}"
+}
+EOF
+  install -Dm644 "${srcdir}/${chromium_extension_id}.json" "${extensions_dir}/${chromium_extension_id}.json"
 }
 
 package_metamask-latest-firefox() {
